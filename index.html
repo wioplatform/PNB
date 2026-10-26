@@ -1,0 +1,474 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>기도수첩 메이커</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700&family=Noto+Serif+KR:wght@600;700&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<style>
+/* Layout: left rail (입력 or 영상), right A4 paper. Paper stays white for print. */
+:root{
+  --bg:#f3f1ec; --fg:#1f1d1a; --muted:#6c675f; --panel:#fbfaf7; --line:#ddd8cf;
+  --accent:#2f5d8a; --memo:#e4f1fb; --memo-line:#bfd9ee; --paper:#fff; --ink:#111;
+  --sans:"Noto Sans KR","Apple SD Gothic Neo","Malgun Gothic",sans-serif;
+  --serif:"Noto Serif KR","Apple Myungjo",serif; color-scheme:light;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#1b1a18; --fg:#ebe7df; --muted:#a39d92; --panel:#262421; --line:#3b3833; --accent:#8fb4dc; color-scheme:dark; } }
+:root[data-theme="dark"]{ --bg:#1b1a18; --fg:#ebe7df; --muted:#a39d92; --panel:#262421; --line:#3b3833; --accent:#8fb4dc; color-scheme:dark; }
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--sans);font-size:14px}
+.app{display:grid;grid-template-columns:340px 1fr;min-height:100vh}
+.app.note{grid-template-columns:minmax(360px,38%) 1fr}
+.app.video{grid-template-columns:minmax(400px,46%) 1fr}
+.app.video .stage{align-items:stretch}
+.reader{display:none;max-width:820px;background:var(--paper);color:var(--ink);border-radius:12px;padding:28px 32px;font-size:16px;line-height:1.8;word-break:break-all;overflow-wrap:anywhere;box-shadow:0 2px 14px rgba(0,0,0,.08)}
+.app.video .reader{display:block}.app.video .doc{display:none}
+.reader p{margin:0 0 .7em}.reader .sec{font-weight:700;font-size:1.15em;margin:1.2em 0 .4em}.reader .sub{font-weight:700;margin:1em 0 .3em}.reader .t{font-weight:700;font-size:1.25em}.reader .verse0{font-weight:500;color:#2f5d8a;margin-bottom:1em}.reader .rh{font-family:var(--serif);font-size:1.5em;margin:0 0 .2em}.reader .rsum{background:#f6f4ef;padding:14px 16px;border-radius:8px;margin:0 0 1.4em;font-size:.95em}.reader .rsum p{margin:0 0 .5em}
+@media (max-width:900px){.app,.app.note{grid-template-columns:1fr}}
+
+.rail{background:var(--panel);border-right:1px solid var(--line);padding-block:16px;
+  padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;gap:12px;position:sticky;top:0;height:100vh;overflow:auto}
+@media (max-width:900px){.rail{position:static;height:auto;border-right:0;border-bottom:1px solid var(--line)}}
+.rail h1{font-family:var(--serif);font-size:19px;margin:0;letter-spacing:-.3px}
+.tabs{display:flex;gap:4px;background:var(--bg);padding:4px;border-radius:8px}
+.tabs button{flex:1;border:0;background:transparent;padding:8px;border-radius:6px;font-weight:600;color:var(--muted)}
+.tabs button.on{background:var(--panel);color:var(--fg);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+label.f{display:flex;flex-direction:column;gap:5px;font-size:12px;color:var(--muted);font-weight:500}
+textarea{width:100%;min-height:100px;resize:vertical;font:12.5px/1.5 var(--sans);color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px}
+textarea:focus,button:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+.row{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--muted)}
+.row span{width:44px}
+.row input[type=range]{flex:1;accent-color:var(--accent)}
+.row output{min-width:48px;text-align:right;font-variant-numeric:tabular-nums;color:var(--fg)}
+.btns{display:flex;gap:6px;flex-wrap:wrap}
+button{font:600 13px var(--sans);padding:8px 12px;border-radius:6px;border:1px solid var(--line);background:var(--bg);color:var(--fg);cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.hint{font-size:11.5px;color:var(--muted);line-height:1.55;margin:0}
+.chk{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+details summary{cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);margin-bottom:8px}
+details .inner{display:flex;flex-direction:column;gap:8px}
+.player{position:relative;width:100%;aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden}
+.player iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.player .empty{position:absolute;inset:0;display:grid;place-items:center;color:#aaa;font-size:12px;padding:12px;text-align:center}
+.vtitle{font-size:13px;font-weight:600}
+
+/* highlight toolbar */
+.tb{position:fixed;z-index:50;display:none;gap:4px;background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:6px;box-shadow:0 4px 16px rgba(0,0,0,.18)}
+.tb.show{display:flex}
+.tb button{width:26px;height:26px;padding:0;border-radius:6px;border:1px solid rgba(0,0,0,.08);font-size:12px}
+.tb .sep{width:1px;background:var(--line);margin:2px 3px}
+.tb .fc{background:#fff;font-weight:700}
+
+.stage{padding-block:24px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));
+  display:flex;flex-direction:column;align-items:center;gap:20px;overflow-x:auto}
+.toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--fg);color:var(--bg);padding:8px 14px;border-radius:8px;font-size:12px;opacity:0;transition:.2s;pointer-events:none}
+.toast.show{opacity:1}
+
+/* ---------- paper ---------- */
+.doc{--fs:10pt;--lh:1.6;--ls:0em;--memo:44;--m:14mm;color:var(--ink);font-family:var(--sans);letter-spacing:var(--ls)}
+.page{background:var(--paper);width:210mm;min-height:297mm;padding:var(--m);box-shadow:0 2px 14px rgba(0,0,0,.12);position:relative}
+.page.summary{height:297mm;--fs1:var(--fs)}
+.summary .left{display:flex;flex-direction:column;min-width:0;width:calc(100% - var(--memo)*1% - 6mm);height:100%;overflow:hidden}
+.memo{position:absolute;top:var(--m);right:var(--m);bottom:var(--m);width:calc((210mm - var(--m)*2) * var(--memo) / 100);
+  background:var(--memo);border:1px solid var(--memo-line);border-radius:14px;-webkit-print-color-adjust:exact;print-color-adjust:exact;
+  display:flex;flex-direction:column;padding:4mm;gap:3mm;overflow:hidden}
+.memo .sq{display:flex;gap:2mm;margin:1mm 0 3mm}
+.memo .sq i{flex:1;aspect-ratio:1;border:1px solid #b9d4ea;border-radius:2mm;background:rgba(255,255,255,.5)}
+.memo .sch{display:flex;flex-direction:column;gap:0}
+.memo .sch div{height:6.2mm;border-bottom:1px dashed #c9dff0;font-size:8.5pt;line-height:6.2mm;color:#223;outline:none;white-space:nowrap;overflow:hidden}
+.memo .free{flex:1;font-size:9pt;line-height:1.7;color:#223;outline:none;white-space:pre-wrap;overflow:hidden;margin-top:3mm}
+.date{font-size:10pt;color:#333}
+.doc h2.title{font-family:var(--serif);font-size:22pt;margin:2px 0 2px;letter-spacing:-.5px;line-height:1.25}
+.ref{font-size:9.5pt;color:#333;margin:0 0 8px}
+.verse{font-size:9.5pt;line-height:1.6;font-weight:500;margin:0 0 10px;word-break:break-all;overflow-wrap:anywhere}
+.hymn{font-size:9pt;color:#444;margin:0 0 10px}
+.summary .body p{font-size:var(--fs1);line-height:var(--lh);margin:0 0 .6em;text-indent:1em;word-break:break-all;overflow-wrap:anywhere}
+.summary .body p.h{font-weight:700;text-indent:0;margin-top:.9em}
+.prayer{font-size:calc(var(--fs1) - .5pt);line-height:var(--lh);margin:auto 0 0;padding-top:6mm;word-break:break-all;overflow-wrap:anywhere}
+.foot{font-size:8.5pt;color:#444;margin-top:6px}
+.links{font-size:6.5pt;color:#666;margin-top:6px;line-height:1.5;word-break:break-all}
+.links div{margin-top:3px}
+
+/* transcript */
+.meta{width:calc(50% - 3.5mm);border-collapse:collapse;font-size:8.5pt;margin:0 0 5mm;table-layout:fixed}
+.meta td{border:1px solid #333;padding:1.5px 6px;line-height:1.5;vertical-align:top;word-break:break-all}
+.meta td:first-child{width:13mm;white-space:nowrap;background:#f4f4f4;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.cols{column-count:2;column-gap:7mm;column-fill:balance;font-size:var(--fs);line-height:var(--lh);word-break:break-all;overflow-wrap:anywhere}
+.cols.one{column-count:1;width:calc(100% - var(--memo)*1% - 6mm)}
+.cols p{margin:0 0 .55em;text-indent:1em}
+.cols .grp{break-inside:avoid;page-break-inside:avoid}
+.cols .sec{font-weight:700;font-size:calc(var(--fs) + 1pt);margin:.9em 0 .3em;text-indent:0;break-after:avoid}
+.cols .sub{font-weight:700;margin:.7em 0 .2em;text-indent:0;break-after:avoid}
+.cols .verse0{text-indent:0;font-weight:500;margin-bottom:.8em}
+.cols .t{font-weight:700;font-size:calc(var(--fs) + 1.5pt);text-indent:0;margin:0 0 .3em}
+.page.body .memo{top:calc(var(--m) + 24mm)}
+[contenteditable]{outline:none}
+
+@media (max-width:900px){.stage{align-items:flex-start}}
+
+@media print{
+  @page{size:A4;margin:0}
+  html,body{background:#fff}
+  .rail,.tb,.toast,.reader{display:none!important}
+  .doc{display:block!important}
+  .app{display:block}
+  .stage{padding:0;gap:0;display:block;overflow:visible}
+  .page{box-shadow:none;margin:0;page-break-after:always;break-after:page;width:210mm}
+  .page.summary{height:297mm}
+  .page.body{min-height:0;height:auto}
+}
+</style>
+</head>
+<body>
+<div class="app" id="app">
+  <aside class="rail">
+    <h1>기도수첩 메이커</h1>
+    <div class="tabs"><button id="tabEdit" class="on">입력</button><button id="tabNote">노트</button><button id="tabVideo">영상+녹취록</button></div>
+
+    <div id="paneEdit" style="display:flex;flex-direction:column;gap:12px">
+      <label class="f">① 카톡 매일 메시지 붙여넣기
+        <textarea id="kakao" placeholder="#기도수첩 … 전체 복사"></textarea></label>
+      <label class="f">② 녹취록 붙여넣기 (에버노트 본문 전체 선택 → 복사)
+        <textarea id="trans" placeholder="녹취록 본문"></textarea></label>
+      <div class="btns">
+        <button class="primary" id="render">오늘 노트 만들기</button>
+        <button id="openNote">에버노트 열기</button>
+        <button id="clear">비우기</button>
+      </div>
+      <p class="hint">"에버노트 열기"는 카톡 메시지의 [문서보기] 링크를 새 탭으로 엽니다. 본문 전체 선택(⌘/Ctrl+A) → 복사 → ②에 붙여넣기. 브라우저 보안상 페이지가 에버노트를 직접 읽어올 수는 없습니다.</p>
+      <p class="hint">노트를 새로 만들면 하이라이트·메모 편집은 초기화됩니다.</p>
+      <div><div class="hint" style="font-weight:700;margin-bottom:6px">이력 (이 브라우저에 저장된 노트)</div><div id="hist" style="display:flex;flex-direction:column;gap:4px"></div></div>
+    </div>
+
+    <div id="paneNote" style="display:none;flex-direction:column;gap:12px">
+      <div class="player" id="player"><div class="empty">카톡 메시지의 [동영상 보기] 링크가 여기서 재생됩니다</div></div>
+      <div class="vtitle" id="vtitle"></div>
+      <div class="row" style="gap:6px"><input type="url" id="yturl2" placeholder="유튜브 주소 직접 입력" style="flex:1;font:12.5px var(--sans);padding:7px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)"><button id="ytgo2">재생</button></div>
+      <div class="btns">
+        <button class="primary" id="print">PDF로 저장</button>
+        <button id="jpg">JPG로 저장</button>
+      </div>
+      <p class="hint">PDF: 인쇄 창에서 대상 <b>PDF로 저장</b>, 여백 <b>없음</b>, 배경 그래픽 <b>켜기</b>. 하이라이트와 메모가 그대로 들어갑니다.</p>
+      <p class="hint">본문을 드래그하면 하이라이트·글자색 도구가 뜹니다. 메모 박스는 바로 타이핑하세요.</p>
+    </div>
+
+    <div id="paneVideo" style="display:none;flex-direction:column;gap:10px">
+      <div class="player" id="player2"></div>
+      <div class="vtitle" id="vtitle2"></div>
+      <p class="hint" id="ytlink"></p>
+      <div class="row" style="gap:6px"><input type="url" id="yturl" placeholder="유튜브 주소 직접 입력 (오류 시)" style="flex:1;font:12.5px var(--sans);padding:7px 8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg)"><button id="ytgo">재생</button></div>
+      <p class="hint">"오류 153"이 뜨면 파일을 직접 열어서(file://) 유튜브가 재생을 막는 경우입니다. 주소 입력으로도 안 되면 이 파일을 웹 주소(http)로 띄워야 합니다 — 채팅에서 안내한 방법 참고.</p>
+      <div class="row"><span>글자</span><input type="range" id="rfs" min="13" max="22" step="1" value="16"><output id="rfsv">16px</output></div>
+      <p class="hint">영상을 보면서 오른쪽 녹취록을 읽습니다. 드래그하면 하이라이트 도구가 뜨고, 여기서 칠한 것은 노트에도 그대로 남습니다.</p>
+    </div>
+    <details open>
+      <summary>글자·여백 설정</summary>
+      <div class="inner">
+        <div class="row"><span>글자</span><input type="range" id="fs" min="9" max="13" step="0.5" value="10"><output id="fsv">10pt</output></div>
+        <div class="row"><span>줄간격</span><input type="range" id="lh" min="1.3" max="2.0" step="0.05" value="1.6"><output id="lhv">1.6</output></div>
+        <div class="row"><span>자간</span><input type="range" id="ls" min="-0.05" max="0.1" step="0.005" value="0"><output id="lsv">0</output></div>
+        <div class="row"><span>메모폭</span><input type="range" id="mw" min="30" max="55" step="1" value="44"><output id="mwv">44%</output></div>
+        <div class="row"><span>여백</span><input type="range" id="mg" min="8" max="20" step="1" value="14"><output id="mgv">14mm</output></div>
+        <label class="chk"><input type="checkbox" id="showlinks" checked> 1페이지에 링크 표시</label>
+        <label class="chk"><input type="checkbox" id="memo2"> 녹취록 페이지도 1단 + 메모</label>
+        <p class="hint" id="fitnote"></p>
+      </div>
+    </details>
+    <p class="hint">입력·설정·편집 내용은 이 브라우저에 자동 저장됩니다.</p>
+  </aside>
+
+  <main class="stage" id="stage"></main>
+</div>
+
+<div class="tb" id="tb">
+  <button data-hl="#fff3a3" style="background:#fff3a3" title="노랑"></button>
+  <button data-hl="#ffd9e2" style="background:#ffd9e2" title="핑크"></button>
+  <button data-hl="#d4f5e3" style="background:#d4f5e3" title="민트"></button>
+  <button data-hl="#e6ddff" style="background:#e6ddff" title="라벤더"></button>
+  <button data-hl="#d6ecff" style="background:#d6ecff" title="하늘"></button>
+  <span class="sep"></span>
+  <button class="fc" data-fc="#c0392b" style="color:#c0392b" title="빨강 글자">가</button>
+  <button class="fc" data-fc="#1f5fa8" style="color:#1f5fa8" title="파랑 글자">가</button>
+  <button class="fc" data-fc="#2a7a4b" style="color:#2a7a4b" title="초록 글자">가</button>
+  <button class="fc" data-cmd="bold" title="굵게"><b>B</b></button>
+  <span class="sep"></span>
+  <button data-cmd="clear" title="서식 지우기" style="background:#fff">✕</button>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const esc=s=>String(s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const toast=m=>{const t=$("#toast");t.textContent=m;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2200);};
+
+const SAMPLE_K=`#기도수첩
+2026. 10. 27. 화요일
+
+렘넌트의 망대
+
+이사야 62:6-12 예루살렘이여 내가 너의 성벽 위에 파수꾼을 세우고 그들로 하여금 주야로 계속 잠잠하지 않게 하였느니라 너희 여호와로 기억하시게 하는 자들아 너희는 쉬지 말며 (6) 성문으로 나아가라 나아가라 백성이 올 길을 닦으라 큰길을 수축하고 돌을 제하라 만민을 위하여 기치를 들라 (10)
+
+♬93장 예수는 나의 힘이요
+
+[문서보기]
+https://share.evernote.com/note/b0408d25-05ad-5a90-40e5-893d6a21960e
+
+[동영상 보기]
+https://youtu.be/qjFsOijRt7A?list=PLOCBKggOTU7yqOj4BUIgI_1Yx-MldYCO-
+
+  렘넌트 시기는 중요한 망대를 만드는 시간표입니다. 대부분 성공자는 어릴때 준비가 되어 있었습니다. 큰 질병과 문제, 실패에 있는 사람들은 어릴 때부터 들어간 것이 사탄의 망대가 12전략 되었기 때문입니다. 사탄은 나밖에 모르게 만들어서 내 주장만 하게 하고, 네피림 내 편만 강조하게 합니다. 바벨탑 내 뜻대로 되지 않아서 몸부림치게 됩니다. 무속인, 점술, 우상숭배 결국 영원히 안되는 시간표까지 오게 되는 것입니다. 지옥 배경 이렇게 나를 끌고 다니는 존재를 예수께서는 “너희 아비 마귀”라고 하셨습니다. 그래서 영적 문제가 오고, 삶에도 문제가 오는 것입니다. 지옥이 배경이기 때문에 날이 갈수록 어려워지고 영적 문제가 후대에게 전달됩니다. 이것을 무너뜨리려면 7망대, 7여정, 7이정표를 세워야 합니다. 그러면 절대 망대가 서고, 절대 여정을 가며, 절대 이정표를 세우게 됩니다.
+
+1. 신 6:4-9, 삼상 7:1-15
+  렘넌트들은 예배 때 주시는 메시지를 붙잡고 각인되도록 기도해야 합니다. 하나님께서는 미래를 위해 필요한 것을 주시기 때문에 모든 것에 핑계 대지 말아야 합니다.
+
+2. 왕하 6:8-24, 사 62:6-12
+  렘넌트들은 엘리사처럼 갑절의 영감을 장자의 몫 받아서 300% 주역의 축복을 누려야 합니다. 그리고 기도가 무엇인지 공부해야 합니다. 뇌와 영혼에 각인된 것을 바꾸는 것이 기도입니다.
+
+3. 행 17:1, 18:4, 19:8
+  렘넌트들은 그리스도의 완전성을 영세 전, 성육신, 부활 주, 심판 주, 재림 주 알고, 예배에 성공해서 그 힘으로 공부해야 합니다. 기도도 알아야 하지만 응답이 무엇인지 알아야 합니다. 진짜 응답은 하나님 나라가 임하는 것이고, 하나님 나라의 일은 그 뒤에 이루어지는 것입니다.
+
+  렘넌트들은 나를 살리는 힘이 있어야 하는데, 그것이 기도입니다. 그리고 세상 살리는 힘과 미래 살리는 힘을 300% 가지고 있어야 합니다.
+
+<언약 기도> 하나님 감사드립니다. 새 힘을 허락해 주옵시고 새로운 은혜를 주옵소서. 오늘 확신하는 각인의 시간이 되게 해 주옵소서. 지금 이 시간에 믿음을 고백하게 하옵소서. 예수 그리스도 이름으로 기도하옵니다. 아멘.
+
+2026.01.03. 렘넌트와 TCK 전도학`;
+const SAMPLE_T=`렘넌트의 망대(사62:6-12)
+서론
+1. 사탄의 망대 - 12가지
+조금 듣기 싫은 소리지만 이 망대가 서 있다. 사탄의 망대가. 기분 나쁘지만 예수님이 얘기해주셨다. 사탄이 네 안에 집을 짓고 있다고. 그러니까 뭐 바울도 그런 얘기를 했다. 아예 강한 진이 네 안에 있다. 그러니까 어떻게 되겠냐? 특히 사탄의 12가지 전략이 들어가있다.
+나밖에 모른다. 그러니까 네가 하나님 같이 될 것이다 유혹하니까 넘어간다. 내 주장 밖에 안 한다. 그러니 네피림 된다. 내 편만 좋아. 그게 바벨탑이다. 안 된다. 안 되니까 몸 부림 친다. 그러니까 무속인 찾아간다. 점쟁이 찾아간다. 우상 숭배한다. 안 되니까. 그게 6가지이다. 영원히 안 되는 시간이 온다.
+나를 끌고 다니는 존재가 있는 것이다. 예수님이 그랬다. 너희 아비 마귀. 예수님이 그랬다니까. 기분 되게 나쁘더라도 사실이다. 그러니까 어떻게 되냐? 영적 문제 스스로 오는 것이다. 당연히 오지. 우상 숭배하게 된다. 영적 문제 와. 조금 있으니까 삶에도 문제가 오는 것이다. 알고 봤더니 배경이 완전히 지옥 배경이다. 하나님 나라에 속한 사람이 아니란 말이다. 실컷 공부했는데 나중에 이상하게 되어버린다. 날이 갈수록 어려운 것이다. 이래서 영적 문제가 우리 자녀에게 간다. 12가지 얘기했다. 이거에 지금 망대가 세워졌다. 무너뜨려야 한다.
+2. 7. 7. 7
+7 망대, 여정, 이정표를 세워야 된다.
+3. 절대
+그러면 이게 아까 얘기했다. 절대로 바뀐다. 이게 이제 진짜 응답이다. 내게 절대 망대가 서고 여정 가지고 이정표가 흐르고. 이게 응답이다.
+▣ 본론
+그래서 렘넌트들이 붙잡아야 될 성경 구절 몇 개 있다.
+1. 신 6:4-9 ( 각인 )
+신명기 6장 4절 9절이다. 매일 하면 좋다. 이스라엘이 지금 애굽에서 나와서 광야에서 마지막 시간을 보낸 것이다. 이 마지막 시간이니까 어떻게 되겠냐? "너희는 힘과 정성과 모든 것을 다하여 여호와를 사랑하라. 그리고 지금까지 있었던 일을 네 자녀에게 가르쳐라." 그냥 가르친 게 아니다. "손목에, 이마에, 벽에 뭐 어디든지 길에서도 보도록 해라." 그 말이 뭐냐? 각인시켜버려라. 이걸로 끝이다. 각인된 걸로 뿌리내리기 때문에 그 뒤에 것 몰라도 된다. 뿌리 내린 걸로 체질되기 때문에 신경쓸 것 없다. 각인.
+주일 날 예배드리고 한 단어가 딱 잡힐 것 아니오? 각인 되도록 기도해라. 그날. 짧게도 좋다. 더 잘하려면 찬양 시간에 소리 내서 기도해라. 목적이 뭐냐? 내 영혼 속에 각인 되도록. 그 뒤에는 잊어버려도 된다. 뭐 바쁜데 지난 주 설교 제목 외울 것이냐? 그럴 필요가 없다. 바쁘고 힘든데 가서 일 해야 되는데 힘을 얻어야지. 그날 메시지와 은혜를 각인시켜라. 주일 날 잠시라도 제일 예배 드릴 때 기도 제대로 해야 된다. 그걸로 끝이다. 그러면 놀라운 망대가 서기 시작한다.
+2. 삼상 7:1-15 ( 핑계 )
+뭐냐? 미스바 운동이다. "모든 이스라엘은 여호와께로 돌아와라." 핑계대면 안 된다. 블레셋 때문이냐? 늘 블레셋에게 고난 당해. 블레셋 때문이냐? 우리가 일본에게 많이 당했다. 일본 때문이냐? 일본 이길 힘이 있어야지. 맨날 블레셋, 블레셋. 그러면 안 된다. 특히 우리 렘넌트들 핑계대면 안 된다. 아니 우리 집은 왜 그러냐? 하나님이 여러분에게 미래를 위해서 필요한 것을 주신 것이다. 모든 이스라엘은 여호와께로 돌아와라. 그렇다. 모든 우상 버려라. 그러면서 피 제단 드렸다. 복음 회복해라. 이스라엘은 여호와만 발하라. 능력 얻어라. 그거다. "사무엘이 살아있는 동안에는 전쟁이 없었다." 당연하다. 우리 렘넌트들이 기억해야 된다.
+3. 왕하 6:8-24 ( 장자의 몫 )
+뭐냐? 도단성 운동이다. 처음부터 엘리사는 달랐다. 다른 사람 다 눈에 보이는 욕심만 따라갔다. 이익만 따라갔다. 전부. 지금은 먹을 것만 따라갔다. 모든 주의 종들이. 그때 엘리사는 달랐다. "나에게 갑절의 영감을 주옵소서." 갑절의 영감을 누구에게 줬냐? 장자에게 줬다. 결국 이 사람이 도단성 운동 핀 것이다. 렘넌트는 미리 각오해라. 나에게 300% 주역의 축복을 주옵소서. 안 되는 사람들 안 된다 하지 말고 제일 기초로 내려가서 제일 높은 곳을 향해 쳐다봐라. 자꾸 뭐 꾸밀 것 없다. 그럼 되게 되어 있다.
+4. 사62:6-12 ( 기도 )
+렘넌트들 붙잡아야 될 것이다. 뭐냐? "파수꾼을 세워라. 종일 종야 여호와로 쉬지 못하게 하라. 대로를 수축해라. 만민을 위해 기를 들어라." 파수꾼은 뭐를 할 줄 알아야 되냐? 파수를 할 줄 알아야 된다. 기도가 뭔지 공부해라. 기도가 뭔지 모르면 큰일난다. 결국 여러분은 과거에 생각했던 수준이 지금 응답 와있다. 결국 지금 수준대로 나중에 된다. 그럴러면 나의 뇌를 바꾸고 영혼을 바꾸고 바꿔야 된다. 그 답이 기도이다. 기도나 하자. 그런 기도가 아니다. 여러분의 큰 어려움 왔을 때 기도하는 것도 괜찮다. 그러나 그거 오기 전에 기도가 뭔지 알아야 된다. 그러면 어려움 만나도 괜찮다. 렘넌트 꼭 그래야 한다.
+5. 행 17:1, 18:4, 19:8
+회당이다. 여기에서 렘넌트는 세 가지 알아야 된다.
+1) 그리스도의 완전성
+그리스도의 완전성. 여러분은 과거 잊어버리면 된다는데 안 된다. 잊어지지도 않고 잊어버려도 안 된다. 과거 문제 없어지지 않는다. 어떤 종교도 이는 이, 코는 코, 눈은 뭐 그거는 종교지 구원이 아니다. 과거에 지은 죄들을 지금 당한다? 그건 종교다. 맞는 말이다. 복음은 그게 아니다. 네 모든 과거를 끝냈다. 창세전 그리스도. 여러분이 그 축복으로 하나님 자녀가 됐다. 성육신하신 그리스도. 지금도 그 이름으로 기도할 수 있다. 지금도 그 이름으로 사탄 쫓겨난다. 부활하신 그리스도. 여러분 미래 어떻게 하냐? 그때까지 다 책임진다. 재림주로 오신 그리스도. 더 중요한 것. 우리는 죽지 않는다. 영혼이 나와서 가는 것이다. 다른 말다 거짓말이다. 안 죽는다. 그래서 영원히 죽지 아니하니라. 그래서 진짜로 자기 집으로 가는 것이다, 나와서. 이거는 임시 집이다. 그 임시 집이 허물어지니까 나와야지. 그래서 진짜 자기 집으로 가는 것이다. 그게 천국이냐 지옥이냐. 그 심판의 결론은 누구냐? 심판주 그리스도. 여러분이 너무 잘 살아서 천국 가는 게 아니다. 뭐냐? 천국 백성이라. 할 수 없이 가야 된다. 내가 너무 못 됐다? 너 지옥 가. 아니다. 지옥 백성이다. 하나님 안 믿고 다른 것 믿어. 그게 지옥 백성이다. 당연히 가야 된다. 심판주 그리스도. 그리스도의 완전성을 설명했다. 이거 렘넌트에게 얘기해줘야 된다.
+2) 예배
+19장 8절 뭐냐? "안식일마다" 이랬다. 예배이다. 렘넌트는 예배에 성공해야 된다. 왜? 그 힘으로 공부해야 된다. 완전히 다르다.
+3) 응답
+19장 8절. 기도도 알지만 응답이 뭔가를 알아야 된다. 뭐냐? 하나님 나라 임하는 게 응답이다. 일은 그 뒤에 이루어지는 것이다. 무슨 말이냐? 여러분 죽기 전에 몸도 죽기 전에 내 몸에 문제부터 먼저 오는 것이다. 여러분이 사람 자살하기 전에 먼저 흑암에 덮히는 것이다. 그렇듯이 뭐가 이루기 전에 하나님 나라라는 응답부터 임하는 것이다. 렘넌트들 꼭 기억해야 된다. 지금 응답 없어도 준비해면 된다. 뭘 하든지 300% 준비해야 된다.
+▣ 결론
+( 나 )
+나를 살리는 힘이 있어야 된다. 그게 기도다.
+( 세상 )
+이러면 세상 살리는 힘이 있어야 된다. 이거 있으면 싸우지 않고 이긴다.
+( 미래 ) - 300%
+여러분들은 미래 살리는 힘을 가지고 있어야 된다. 이게 300%이다. 지금 준비하면 된다. 어떤 학교 나오든 상관 없다. 이거 준비하면 된다. 어떤 직업이든 상관 없다. 이렇게 하면 된다. 회사 가거든 일을 이렇게 해야 된다. 그러면 된다. 기도하겠다.
+기도
+하나님께 감사드립니다. 새 힘을 허락해 주옵시고. 새로운 은혜를 주옵소서. 오늘 확신하는 각인의 시간이 되게 해 주옵소서. 지금 이 시간에 믿음을 고백하게 하옵소서. 예수 그리스도 이름으로 기도하옵나이다. 아멘.`;
+
+/* ---- 카톡 메시지 파싱 ---- */
+function parseKakao(t){
+  const lines=t.replace(/\r/g,"").split("\n").map(l=>l.replace(/\s+$/,""));
+  const o={date:"",title:"",ref:"",verse:"",hymn:"",doc:"",video:"",body:[],prayer:"",source:""};
+  let i=0;const nz=()=>{while(i<lines.length&&!lines[i].trim())i++;};
+  nz(); if(/^#?기도수첩/.test(lines[i]||""))i++;
+  nz(); if(/\d{4}\.\s*\d{1,2}\.\s*\d{1,2}/.test(lines[i]||"")){o.date=lines[i].trim();i++;}
+  nz(); o.title=(lines[i]||"").trim(); i++;
+  nz(); {const m=(lines[i]||"").trim().match(/^(\S+\s*\d+:\d+(?:[-~]\d+)?(?:,\s*\d+:\d+(?:[-~]\d+)?)*)\s*(.*)$/); if(m){o.ref=m[1];o.verse=m[2];i++;}}
+  for(;i<lines.length;i++){
+    const l=lines[i].trim(); if(!l)continue;
+    if(/^♬/.test(l)){o.hymn=l.replace(/^♬\s*/,"");continue;}
+    if(/^\[문서\s*보기\]/.test(l)){i++;nz();o.doc=(lines[i]||"").trim();continue;}
+    if(/^\[동영상\s*보기\]/.test(l)){i++;nz();o.video=(lines[i]||"").trim();continue;}
+    if(/^[<＜]언약\s*기도[>＞]/.test(l)){o.prayer=l.replace(/^[<＜]언약\s*기도[>＞]\s*/,"");
+      const rest=lines.slice(i+1).map(x=>x.trim()).filter(Boolean);
+      if(rest.length){ if(!/아멘\.?$/.test(o.prayer)&&!/^\d{4}\./.test(rest[0])){o.prayer+=" "+rest.shift();} o.source=rest.join(" ");}
+      break;}
+    o.body.push(l);
+  }
+  return o;
+}
+/* ---- 녹취록 → [kind, text] ---- */
+function parseTranscript(t){
+  t=t.replace(/\r/g,"").replace(/--- Embedded Content ---/g,"").replace(/^에버노트 라이트 편집기에 오신 것을 환영합니다!\s*/,"").trim();
+  let lines=t.split("\n").map(l=>l.trim()).filter(Boolean);
+  if(lines.length<6){ // 한 덩어리 → 규칙으로 쪼개기
+    let s=lines.join(" ");
+    s=s.replace(/\s*(▣\s*\S+|♠\S+)\s/g,"\n$1\n").replace(/\s(서론|결론)\s/g,"\n$1\n").replace(/\s(기도)\s(?=하나님께)/g,"\n$1\n")
+       .replace(/\s(\d\.\s*[^\n(]{1,40}?\s*(?:\(\s*[^)]*\))?)\s(?=[가-힣"“])/g,"\n$1\n")
+       .replace(/\s(\d\)\s*[가-힣 ]{1,20})\s(?=[가-힣"“])/g,"\n$1\n")
+       .replace(/(?<![가-힣)\d])\s(\(\s*[가-힣 ]{1,10}\s*\)(?:\s*-\s*\S+)?)\s(?=[가-힣])/g,"\n$1\n");
+    lines=[];
+    for(const blk of s.split("\n").map(x=>x.trim()).filter(Boolean)){
+      if(blk.length<=45&&/^(▣|♠|서론|본론|결론|기도|\d[.)]|\()/.test(blk)){lines.push(blk);continue;}
+      const sents=blk.split(/(?<=[.?!다])\s+(?=[가-힣"“(])/); let para=[];
+      for(const x of sents){para.push(x);if(para.length>=4){lines.push(para.join(" "));para=[];}}
+      if(para.length)lines.push(para.join(" "));
+    }
+  }
+  const out=[];
+  lines.forEach((l,idx)=>{
+    if(idx===0&&/\(.+\d+:\d+/.test(l)&&l.length<40){out.push(["t",l]);return;}
+    if(/^(▣|♠)/.test(l)||/^(서론|본론|결론|기도)(\s*[-–:].*)?$/.test(l))out.push(["sec",l]);
+    else if(l.length<=45&&/^(\d+[.)]\s*|\(\s*[가-힣 ]{1,10}\s*\))/.test(l)&&!/[다요]\.$/.test(l))out.push(["sub",l]);
+    else out.push(["p",l]);
+  });
+  return out;
+}
+const ytId=u=>{const m=String(u||"").match(/(?:youtu\.be\/|v=|embed\/)([\w-]{11})/);return m?m[1]:"";};
+
+let K={};
+function render(){
+  ytOverride=""; K=parseKakao($("#kakao").value); const tr=parseTranscript($("#trans").value);
+  const showlinks=$("#showlinks").checked, memo2=$("#memo2").checked;
+  const bodyHtml=K.body.map(l=>/^\d+\.\s/.test(l)&&l.length<60?`<p class="h">${esc(l)}</p>`:`<p>${esc(l)}</p>`).join("");
+  const links=showlinks&&(K.doc||K.video)?`<div class="links">${K.doc?`<div>[문서 보기] ${esc(K.doc)}</div>`:""}${K.video?`<div>[동영상 보기] ${esc(K.video)}</div>`:""}</div>`:"";
+  const memoBox=`<div class="memo">
+    <div class="sq"><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <div class="sch">${Array.from({length:8},()=>'<div contenteditable="true"></div>').join("")}</div>
+    <div class="free" contenteditable="true"></div>
+  </div>`;
+  const p1=`<div class="doc"><div class="page summary">
+    <div class="left" contenteditable="true" spellcheck="false">
+      <div class="date">${esc(K.date)}</div>
+      <h2 class="title">${esc(K.title)}</h2>
+      <div class="ref">(${esc(K.ref)})</div>
+      <p class="verse">${esc(K.verse)}</p>
+      ${K.hymn?`<div class="hymn">♬ 찬송가 ${esc(K.hymn)}</div>`:""}
+      <div class="body">${bodyHtml}</div>
+      <div class="prayer"><b>[언약 기도]</b> ${esc(K.prayer)}</div>
+      ${K.source?`<div class="foot">${esc(K.source)}</div>`:""}${links}
+    </div>${memoBox}
+  </div></div>`;
+  // 번호 단위로 묶어서 단/페이지 사이에서 끊기지 않게
+  let groups=[],cur=null;
+  for(const [kind,txt] of tr){
+    if(kind!=="p"||!cur){cur=[];groups.push(cur);}
+    cur.push([kind,txt]);
+  }
+  const colsHtml=groups.map(g=>`<div class="grp">`+g.map(([kind,txt])=>
+    kind==="t"?`<p class="t">${esc(txt)}</p>`:kind==="sec"?`<p class="sec">${esc(txt)}</p>`:kind==="sub"?`<p class="sub">${esc(txt)}</p>`:`<p>${esc(txt)}</p>`).join("")+`</div>`).join("");
+  const meta=`<table class="meta"><tr><td>날짜</td><td>${esc(K.date)}</td></tr><tr><td>제목</td><td>${esc(K.title)}</td></tr><tr><td>성경</td><td>${esc(K.ref)}</td></tr>${K.source?`<tr><td>출처</td><td>${esc(K.source)}</td></tr>`:""}</table>`;
+  const verse0=K.verse?`<p class="verse0">♠ 성경말씀(${esc(K.ref)}) ${esc(K.verse)}</p>`:"";
+  const p2=`<div class="doc"><div class="page body">${meta}
+    <div class="cols ${memo2?"one":""}" contenteditable="true" spellcheck="false">${verse0}${colsHtml}</div>
+    ${memo2?`<div class="memo"><div class="free" contenteditable="true"></div></div>`:""}
+  </div></div>`;
+  const reader=`<div class="reader" contenteditable="true" spellcheck="false"><div class="rh">${esc(K.title)}</div><div class="hint" style="margin-bottom:12px">${esc(K.date)} · ${esc(K.ref)}</div>
+    <div class="rsum">${bodyHtml}</div><div class="rbody">${verse0}${colsHtml}</div></div>`;
+  $("#stage").innerHTML=p1+p2+reader;
+  setPlayer(); applyVars(); saveEdits(); toast("노트를 만들었습니다");
+}
+let ytOverride="";
+function setPlayer(){
+  const id=ytId(ytOverride||K.video); const p=$("#player");
+  $("#player2").innerHTML="";
+  p.innerHTML=id?`<iframe src="https://www.youtube.com/embed/${id}?rel=0&modestbranding=1&playsinline=1" allow="autoplay; encrypted-media; picture-in-picture" allowfullscreen referrerpolicy="strict-origin-when-cross-origin" title="기도수첩 영상"></iframe>`:`<div class="empty">카톡 메시지에 [동영상 보기] 링크가 없습니다</div>`;
+  $("#vtitle").textContent=$("#vtitle2").textContent=K.title?`${K.date||""}  ${K.title}`:"";
+  $("#ytlink").innerHTML=id?`영상이 안 나오면 <a href="https://www.youtube.com/watch?v=${id}" target="_blank" rel="noopener">유튜브에서 열기</a>`:"";
+  if($("#app").classList.contains("video")&&p.firstElementChild)$("#player2").appendChild(p.firstElementChild);
+}
+function applyVars(){
+  const fs=$("#fs").value,lh=$("#lh").value,ls=$("#ls").value,mw=$("#mw").value,mg=$("#mg").value;
+  $("#fsv").textContent=fs+"pt";$("#lhv").textContent=lh;$("#lsv").textContent=(+ls).toFixed(3).replace(/0+$/,"").replace(/\.$/,"")+"em";$("#mwv").textContent=mw+"%";$("#mgv").textContent=mg+"mm";
+  $$(".doc").forEach(d=>{d.style.setProperty("--fs",fs+"pt");d.style.setProperty("--lh",lh);d.style.setProperty("--ls",ls+"em");d.style.setProperty("--memo",mw);d.style.setProperty("--m",mg+"mm");});
+  fitPage1(); save();
+}
+function fitPage1(){
+  const pg=$(".page.summary"), left=pg&&pg.querySelector(".left"); if(!left)return;
+  let f=parseFloat($("#fs").value); pg.style.setProperty("--fs1",f+"pt");
+  let guard=0; while(left.scrollHeight>left.clientHeight+1&&f>7&&guard++<30){f-=0.25;pg.style.setProperty("--fs1",f+"pt");}
+  $("#fitnote").textContent=f<parseFloat($("#fs").value)?`1페이지는 한 장에 맞추려고 ${f}pt로 줄였습니다`:"";
+}
+/* ---- 저장 ---- */
+function save(){try{localStorage.setItem("pn",JSON.stringify({k:$("#kakao").value,t:$("#trans").value,fs:$("#fs").value,lh:$("#lh").value,ls:$("#ls").value,mw:$("#mw").value,mg:$("#mg").value,sl:$("#showlinks").checked,m2:$("#memo2").checked}));}catch(e){}}
+function saveEdits(){try{localStorage.setItem("pn_edit",JSON.stringify({key:$("#kakao").value.slice(0,80)+"|"+$("#trans").value.length,html:$("#stage").innerHTML,yt:ytOverride}));}catch(e){} archive();}
+function archive(){try{if(!K.date)return;const all=JSON.parse(localStorage.getItem("pn_notes")||"{}");
+  all[K.date]={title:K.title,k:$("#kakao").value,t:$("#trans").value,html:$("#stage").innerHTML,yt:ytOverride,ts:Date.now()};
+  const keys=Object.keys(all).sort((a,b)=>all[b].ts-all[a].ts); keys.slice(60).forEach(k=>delete all[k]);
+  localStorage.setItem("pn_notes",JSON.stringify(all)); renderHist();}catch(e){}}
+function renderHist(){const h=$("#hist"); if(!h)return; let all={}; try{all=JSON.parse(localStorage.getItem("pn_notes")||"{}");}catch(e){}
+  const keys=Object.keys(all).sort((a,b)=>all[b].ts-all[a].ts);
+  h.innerHTML=keys.length?keys.map(k=>`<button data-open="${esc(k)}" style="text-align:left;font-weight:500;display:flex;justify-content:space-between;gap:8px"><span>${esc(k)} · ${esc(all[k].title||"")}</span><span data-del="${esc(k)}" title="삭제" style="color:var(--muted)">✕</span></button>`).join(""):`<p class="hint">아직 없습니다</p>`;
+  h.querySelectorAll("[data-open]").forEach(b=>b.onclick=e=>{const k=b.dataset.open; if(e.target.dataset.del){delete all[k];localStorage.setItem("pn_notes",JSON.stringify(all));renderHist();return;}
+    const n=all[k]; $("#kakao").value=n.k;$("#trans").value=n.t;ytOverride=n.yt||"";$("#stage").innerHTML=n.html;K=parseKakao(n.k);setPlayer();applyVars();save();localStorage.setItem("pn_edit",JSON.stringify({key:n.k.slice(0,80)+"|"+n.t.length,html:n.html,yt:ytOverride}));mode("video");toast(k+" 노트를 열었습니다");});}
+function load(){try{const s=JSON.parse(localStorage.getItem("pn")||"null");if(!s)return false;
+  $("#kakao").value=s.k||"";$("#trans").value=s.t||"";$("#fs").value=s.fs||10;$("#lh").value=s.lh||1.6;$("#ls").value=s.ls||0;$("#mw").value=s.mw||44;$("#mg").value=s.mg||14;$("#showlinks").checked=s.sl!==false;$("#memo2").checked=!!s.m2;return !!(s.k||s.t);}catch(e){return false;}}
+function loadEdits(){try{const e=JSON.parse(localStorage.getItem("pn_edit")||"null");
+  if(e&&e.key===$("#kakao").value.slice(0,80)+"|"+$("#trans").value.length&&e.html){ytOverride=e.yt||"";$("#stage").innerHTML=e.html;K=parseKakao($("#kakao").value);setPlayer();applyVars();return true;}}catch(e){}return false;}
+let edT; $("#stage").addEventListener("input",e=>{syncBody(e.target);clearTimeout(edT);edT=setTimeout(saveEdits,400);});
+function syncBody(t){const rb=t.closest(".rbody"),cols=t.closest(".cols"),rs=t.closest(".rsum"),sb=t.closest(".summary .body");
+  if(rb){const c=$(".cols");if(c)c.innerHTML=rb.innerHTML;} else if(cols){const r=$(".rbody");if(r)r.innerHTML=cols.innerHTML;}
+  else if(rs){const b=$(".summary .body");if(b)b.innerHTML=rs.innerHTML;} else if(sb){const r=$(".rsum");if(r)r.innerHTML=sb.innerHTML;}
+  archive();}
+
+/* ---- 탭 ---- */
+function mode(m){
+  const note=m==="note",video=m==="video"; $("#app").classList.toggle("note",note); $("#app").classList.toggle("video",video);
+  $("#paneEdit").style.display=(!note&&!video)?"flex":"none"; $("#paneNote").style.display=note?"flex":"none"; $("#paneVideo").style.display=video?"flex":"none";
+  $("#tabEdit").classList.toggle("on",!note&&!video); $("#tabNote").classList.toggle("on",note); $("#tabVideo").classList.toggle("on",video);
+  // 플레이어는 한 곳에만 (영상 모드면 왼쪽 큰 플레이어로 이동)
+  const pl=$("#player"),pl2=$("#player2"); if(video&&pl.firstElementChild){pl2.appendChild(pl.firstElementChild);} else if(!video&&pl2.firstElementChild){pl.appendChild(pl2.firstElementChild);}
+  try{localStorage.setItem("pn_mode",m);}catch(e){}
+}
+$("#tabEdit").onclick=()=>mode("edit"); $("#tabNote").onclick=()=>mode("note"); $("#tabVideo").onclick=()=>mode("video");
+function playUrl(v){const id=ytId(v); if(!id){toast("유튜브 주소를 인식하지 못했습니다");return;} ytOverride=v; setPlayer(); saveEdits(); toast("재생합니다");}
+$("#ytgo").onclick=()=>playUrl($("#yturl").value); $("#ytgo2").onclick=()=>playUrl($("#yturl2").value);
+$("#yturl").addEventListener("keydown",e=>{if(e.key==="Enter")playUrl($("#yturl").value);}); $("#yturl2").addEventListener("keydown",e=>{if(e.key==="Enter")playUrl($("#yturl2").value);});
+$("#rfs").addEventListener("input",()=>{$("#rfsv").textContent=$("#rfs").value+"px";const r=$(".reader");if(r)r.style.fontSize=$("#rfs").value+"px";});
+
+/* ---- 하이라이트 툴바 ---- */
+const tb=$("#tb");
+function showTb(){
+  const sel=window.getSelection(); if(!sel||sel.isCollapsed||!sel.rangeCount){tb.classList.remove("show");return;}
+  const r=sel.getRangeAt(0); const inPage=r.commonAncestorContainer.parentElement?.closest(".page,.reader"); if(!inPage){tb.classList.remove("show");return;}
+  const b=r.getBoundingClientRect(); tb.classList.add("show");
+  tb.style.left=Math.max(8,Math.min(window.innerWidth-tb.offsetWidth-8,b.left+b.width/2-tb.offsetWidth/2))+"px";
+  tb.style.top=Math.max(8,b.top-tb.offsetHeight-8)+"px";
+}
+document.addEventListener("selectionchange",()=>setTimeout(showTb,10));
+tb.addEventListener("mousedown",e=>e.preventDefault());
+tb.addEventListener("click",e=>{
+  const b=e.target.closest("button"); if(!b)return;
+  document.execCommand("styleWithCSS",false,true);
+  if(b.dataset.hl)document.execCommand("hiliteColor",false,b.dataset.hl);
+  else if(b.dataset.fc)document.execCommand("foreColor",false,b.dataset.fc);
+  else if(b.dataset.cmd==="bold")document.execCommand("bold");
+  else if(b.dataset.cmd==="clear"){document.execCommand("removeFormat");document.execCommand("hiliteColor",false,"transparent");}
+  const sel=getSelection();const n=sel&&sel.anchorNode&&(sel.anchorNode.nodeType===1?sel.anchorNode:sel.anchorNode.parentElement);if(n)syncBody(n);
+  saveEdits();
+});
+
+/* ---- 내보내기 ---- */
+$("#print").onclick=()=>window.print();
+$("#jpg").onclick=async()=>{
+  const pages=$$(".page"); if(!pages.length)return; toast("JPG 만드는 중…");
+  const base=(K.date||"기도수첩").replace(/[^\d]/g,"").slice(0,8)||"note";
+  for(let i=0;i<pages.length;i++){
+    const c=await html2canvas(pages[i],{scale:2,backgroundColor:"#ffffff",useCORS:true});
+    const a=document.createElement("a"); a.download=`기도수첩_${base}_${i+1}.jpg`; a.href=c.toDataURL("image/jpeg",.92); a.click();
+    await new Promise(r=>setTimeout(r,400));
+  }
+  toast("JPG 저장 완료");
+};
+$("#openNote").onclick=()=>{const k=parseKakao($("#kakao").value); if(k.doc)window.open(k.doc,"_blank"); else toast("메시지에 [문서보기] 링크가 없습니다");};
+$("#render").onclick=()=>{render();mode("video");};
+$("#clear").onclick=()=>{$("#kakao").value="";$("#trans").value="";save();};
+["fs","lh","ls","mw","mg"].forEach(id=>$("#"+id).addEventListener("input",applyVars));
+["showlinks","memo2"].forEach(id=>$("#"+id).addEventListener("change",render));
+["kakao","trans"].forEach(id=>$("#"+id).addEventListener("input",save));
+
+if(!load()){$("#kakao").value=SAMPLE_K;$("#trans").value=SAMPLE_T;}
+if(!loadEdits())render();
+let m="edit";try{m=localStorage.getItem("pn_mode")||"edit";}catch(e){} mode(m); renderHist();
+</script>
+</body>
+</html>
