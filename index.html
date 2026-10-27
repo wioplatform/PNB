@@ -109,6 +109,7 @@ details .inner{display:flex;flex-direction:column;gap:8px}
 .page.body .cols{flex:1;min-height:0}
 .page.body .memo{top:calc(var(--m) + 22mm)}
 .hl{border-radius:2px}
+.cols span[style*="background"],.rbody span[style*="background"],.summary .body span[style*="background"],.rsum span[style*="background"]{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 [contenteditable]{outline:none}
 
 @media (max-width:900px){.stage{align-items:flex-start}}
@@ -121,8 +122,11 @@ details .inner{display:flex;flex-direction:column;gap:8px}
   .doc{display:block!important}
   .app{display:block}
   .stage{padding:0;gap:0;display:block;overflow:visible}
-  .page{box-shadow:none;margin:0;page-break-after:always;break-after:page}
-  .page:last-of-type{page-break-after:auto;break-after:auto}
+  .page{box-shadow:none;margin:0;break-after:auto;break-inside:avoid}
+  .doc+.doc .page,.tdoc .page+.page{break-before:page;page-break-before:always}
+  .stage>*:not(.doc){display:none!important}
+  /* 배경 그래픽을 꺼도 형광펜이 보이도록: 두꺼운 밑줄을 글자 뒤에 깔아 둠 */
+  .hl[style*="--c"]{text-decoration:underline;text-decoration-color:var(--c);text-decoration-thickness:1.15em;text-underline-offset:-0.92em;text-decoration-skip-ink:none}
 }
 </style>
 </head>
@@ -371,6 +375,19 @@ function render(){
   $("#stage").innerHTML=p1+p2+reader;
   setPlayer(); applyVars(); saveEdits(); toast("노트를 만들었습니다");
 }
+/* 예전 버전에서 저장된 노트(페이지 분할 전) 구조를 새 구조로 변환 */
+function migrate(){
+  const st=$("#stage"); if(st.querySelector(".tdoc"))return;
+  const body=st.querySelector(".page.body"); if(!body)return;
+  const doc=body.closest(".doc"); doc.classList.add("tdoc");
+  const cols=body.querySelector(".cols"); if(!cols)return;
+  const v=cols.querySelector(":scope > .verse0"); if(v){const g=document.createElement("div");g.className="grp";g.dataset.i="v";v.replaceWith(g);g.appendChild(v);cols.prepend(g);}
+  else {const g=document.createElement("div");g.className="grp";g.dataset.i="v";cols.prepend(g);}
+  [...cols.querySelectorAll(":scope > .grp")].filter(g=>g.dataset.i!=="v").forEach((g,i)=>g.dataset.i=i);
+  [...cols.querySelectorAll(":scope > :not(.grp)")].forEach((el,i)=>{const g=document.createElement("div");g.className="grp";g.dataset.i="x"+i;el.replaceWith(g);g.appendChild(el);});
+  const rb=st.querySelector(".rbody"); if(rb){const rv=rb.querySelector(":scope > .verse0"); if(rv){const g=document.createElement("div");g.className="grp";g.dataset.i="v";rv.replaceWith(g);g.appendChild(rv);}
+    [...rb.querySelectorAll(":scope > .grp")].filter(g=>g.dataset.i!=="v").forEach((g,i)=>g.dataset.i=i);}
+}
 /* 녹취록을 B5 페이지 여러 장으로 나눔 (grp 단위, 단 사이에서 끊기지 않음) */
 function paginate(){
   const tdoc=$(".tdoc"); if(!tdoc)return;
@@ -405,7 +422,7 @@ function applyVars(){
   const fs=$("#fs").value,lh=$("#lh").value,ls=$("#ls").value,mw=$("#mw").value,mg=$("#mg").value;
   $("#fsv").textContent=fs+"pt";$("#lhv").textContent=lh;$("#lsv").textContent=(+ls).toFixed(3).replace(/0+$/,"").replace(/\.$/,"")+"em";$("#mwv").textContent=mw+"%";$("#mgv").textContent=mg+"mm";
   $$(".doc").forEach(d=>{d.style.setProperty("--fs",fs+"pt");d.style.setProperty("--lh",lh);d.style.setProperty("--ls",ls+"em");d.style.setProperty("--memo",mw);d.style.setProperty("--m",mg+"mm");});
-  fitPage1(); paginate(); save();
+  fitPage1(); migrate(); paginate(); save();
 }
 function fitPage1(){
   const pg=$(".page.summary"), left=pg&&pg.querySelector(".left"); if(!left)return;
@@ -481,23 +498,25 @@ function styleSel(fn){
 tb.addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
   let n=null;
-  if(b.dataset.hl)n=styleSel(sp=>sp.style.backgroundColor=b.dataset.hl);
+  if(b.dataset.hl)n=styleSel(sp=>{sp.style.backgroundColor=b.dataset.hl;sp.style.setProperty("--c",b.dataset.hl);});
   else if(b.dataset.fc)n=styleSel(sp=>sp.style.color=b.dataset.fc);
   else if(b.dataset.cmd==="bold")n=styleSel(sp=>sp.style.fontWeight="700");
   else if(b.dataset.cmd==="clear")n=styleSel(sp=>sp.removeAttribute("style"));
+  // 예전 방식(execCommand)으로 칠해진 span 정리: 블록 구조를 깨지 않도록 인라인 span만 남김
   tb.classList.remove("show");
   if(n)syncBody(n.nodeType===1?n:n.parentElement);
   saveEdits();
 });
 
 /* ---- 내보내기 ---- */
-$("#print").onclick=()=>window.print();
+const fileBase=()=>{const m=(K.date||"").match(/(\d{4})\.\s*(\d{1,2})\.\s*(\d{1,2})/); return m?`기도수첩_${m[1].slice(2)}${m[2].padStart(2,"0")}${m[3].padStart(2,"0")}`:"기도수첩";};
+$("#print").onclick=()=>{const t=document.title; document.title=fileBase(); setTimeout(()=>{window.print(); setTimeout(()=>document.title=t,1500);},50);};
 $("#jpg").onclick=async()=>{
   const pages=$$(".page"); if(!pages.length)return; toast("JPG 만드는 중…");
-  const base=(K.date||"기도수첩").replace(/[^\d]/g,"").slice(0,8)||"note";
+  const base=fileBase();
   for(let i=0;i<pages.length;i++){
     const c=await html2canvas(pages[i],{scale:2.5,backgroundColor:"#ffffff",useCORS:true});
-    const a=document.createElement("a"); a.download=`기도수첩_${base}_${i+1}.jpg`; a.href=c.toDataURL("image/jpeg",.92); a.click();
+    const a=document.createElement("a"); a.download=`${base}_${i+1}.jpg`; a.href=c.toDataURL("image/jpeg",.92); a.click();
     await new Promise(r=>setTimeout(r,400));
   }
   toast("JPG 저장 완료");
