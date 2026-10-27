@@ -68,11 +68,11 @@ details .inner{display:flex;flex-direction:column;gap:8px}
 .toast.show{opacity:1}
 
 /* ---------- paper ---------- */
-.doc{--fs:10pt;--lh:1.6;--ls:0em;--memo:44;--m:14mm;color:var(--ink);font-family:var(--sans);letter-spacing:var(--ls)}
-.page{background:var(--paper);width:210mm;min-height:297mm;padding:var(--m);box-shadow:0 2px 14px rgba(0,0,0,.12);position:relative}
-.page.summary{height:297mm;--fs1:var(--fs)}
+.doc{--fs:9pt;--lh:1.55;--ls:-0.01em;--memo:44;--m:12mm;--pw:176mm;--ph:250mm;color:var(--ink);font-family:var(--sans);letter-spacing:var(--ls)}
+.page{background:var(--paper);width:var(--pw);height:var(--ph);padding:var(--m);overflow:hidden;box-shadow:0 2px 14px rgba(0,0,0,.12);position:relative}
+.page.summary{--fs1:var(--fs)}
 .summary .left{display:flex;flex-direction:column;min-width:0;width:calc(100% - var(--memo)*1% - 6mm);height:100%;overflow:hidden}
-.memo{position:absolute;top:var(--m);right:var(--m);bottom:var(--m);width:calc((210mm - var(--m)*2) * var(--memo) / 100);
+.memo{position:absolute;top:var(--m);right:var(--m);bottom:var(--m);width:calc((var(--pw) - var(--m)*2) * var(--memo) / 100);
   background:var(--memo);border:1px solid var(--memo-line);border-radius:14px;-webkit-print-color-adjust:exact;print-color-adjust:exact;
   display:flex;flex-direction:column;padding:4mm;gap:3mm;overflow:hidden}
 .memo .sq{display:flex;gap:2mm;margin:1mm 0 3mm}
@@ -81,7 +81,7 @@ details .inner{display:flex;flex-direction:column;gap:8px}
 .memo .sch div{height:6.2mm;border-bottom:1px dashed #c9dff0;font-size:8.5pt;line-height:6.2mm;color:#223;outline:none;white-space:nowrap;overflow:hidden}
 .memo .free{flex:1;font-size:9pt;line-height:1.7;color:#223;outline:none;white-space:pre-wrap;overflow:hidden;margin-top:3mm}
 .date{font-size:10pt;color:#333}
-.doc h2.title{font-family:var(--serif);font-size:22pt;margin:2px 0 2px;letter-spacing:-.5px;line-height:1.25}
+.doc h2.title{font-family:var(--serif);font-size:19pt;margin:2px 0 2px;letter-spacing:-.5px;line-height:1.25}
 .ref{font-size:9.5pt;color:#333;margin:0 0 8px}
 .verse{font-size:9.5pt;line-height:1.6;font-weight:500;margin:0 0 10px;word-break:break-all;overflow-wrap:anywhere}
 .hymn{font-size:9pt;color:#444;margin:0 0 10px}
@@ -93,10 +93,10 @@ details .inner{display:flex;flex-direction:column;gap:8px}
 .links div{margin-top:3px}
 
 /* transcript */
-.meta{width:calc(50% - 3.5mm);border-collapse:collapse;font-size:8.5pt;margin:0 0 5mm;table-layout:fixed}
+.meta{width:calc(50% - 3mm);border-collapse:collapse;font-size:8.5pt;margin:0 0 5mm;table-layout:fixed}
 .meta td{border:1px solid #333;padding:1.5px 6px;line-height:1.5;vertical-align:top;word-break:break-all}
 .meta td:first-child{width:13mm;white-space:nowrap;background:#f4f4f4;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.cols{column-count:2;column-gap:7mm;column-fill:balance;font-size:var(--fs);line-height:var(--lh);word-break:break-all;overflow-wrap:anywhere}
+.cols{column-count:2;column-gap:6mm;column-fill:auto;height:100%;font-size:var(--fs);line-height:var(--lh);word-break:break-all;overflow-wrap:anywhere}
 .cols.one{column-count:1;width:calc(100% - var(--memo)*1% - 6mm)}
 .cols p{margin:0 0 .55em;text-indent:1em}
 .cols .grp{break-inside:avoid;page-break-inside:avoid}
@@ -104,21 +104,25 @@ details .inner{display:flex;flex-direction:column;gap:8px}
 .cols .sub{font-weight:700;margin:.7em 0 .2em;text-indent:0;break-after:avoid}
 .cols .verse0{text-indent:0;font-weight:500;margin-bottom:.8em}
 .cols .t{font-weight:700;font-size:calc(var(--fs) + 1.5pt);text-indent:0;margin:0 0 .3em}
-.page.body .memo{top:calc(var(--m) + 24mm)}
+.page.body{display:flex;flex-direction:column}
+.page.body .meta{flex:none}
+.page.body .cols{flex:1;min-height:0}
+.page.body .memo{top:calc(var(--m) + 22mm)}
+.hl{border-radius:2px}
 [contenteditable]{outline:none}
 
 @media (max-width:900px){.stage{align-items:flex-start}}
 
 @media print{
-  @page{size:A4;margin:0}
+  @page{size:176mm 250mm;margin:0}
   html,body{background:#fff}
+  *{-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
   .rail,.tb,.toast,.reader{display:none!important}
   .doc{display:block!important}
   .app{display:block}
   .stage{padding:0;gap:0;display:block;overflow:visible}
-  .page{box-shadow:none;margin:0;page-break-after:always;break-after:page;width:210mm}
-  .page.summary{height:297mm}
-  .page.body{min-height:0;height:auto}
+  .page{box-shadow:none;margin:0;page-break-after:always;break-after:page}
+  .page:last-of-type{page-break-after:auto;break-after:auto}
 }
 </style>
 </head>
@@ -151,7 +155,7 @@ details .inner{display:flex;flex-direction:column;gap:8px}
         <button class="primary" id="print">PDF로 저장</button>
         <button id="jpg">JPG로 저장</button>
       </div>
-      <p class="hint">PDF: 인쇄 창에서 대상 <b>PDF로 저장</b>, 여백 <b>없음</b>, 배경 그래픽 <b>켜기</b>. 하이라이트와 메모가 그대로 들어갑니다.</p>
+      <p class="hint">PDF: 인쇄 창에서 대상 <b>PDF로 저장</b>, 용지 <b>B5</b>, 여백 <b>없음</b>. 하이라이트·메모가 그대로 들어갑니다(B5 176×250mm).</p>
       <p class="hint">본문을 드래그하면 하이라이트·글자색 도구가 뜹니다. 메모 박스는 바로 타이핑하세요.</p>
     </div>
 
@@ -167,11 +171,11 @@ details .inner{display:flex;flex-direction:column;gap:8px}
     <details open>
       <summary>글자·여백 설정</summary>
       <div class="inner">
-        <div class="row"><span>글자</span><input type="range" id="fs" min="9" max="13" step="0.5" value="10"><output id="fsv">10pt</output></div>
-        <div class="row"><span>줄간격</span><input type="range" id="lh" min="1.3" max="2.0" step="0.05" value="1.6"><output id="lhv">1.6</output></div>
-        <div class="row"><span>자간</span><input type="range" id="ls" min="-0.05" max="0.1" step="0.005" value="0"><output id="lsv">0</output></div>
+        <div class="row"><span>글자</span><input type="range" id="fs" min="7.5" max="13" step="0.5" value="9"><output id="fsv">9pt</output></div>
+        <div class="row"><span>줄간격</span><input type="range" id="lh" min="1.2" max="2.0" step="0.05" value="1.55"><output id="lhv">1.55</output></div>
+        <div class="row"><span>자간</span><input type="range" id="ls" min="-0.06" max="0.08" step="0.005" value="-0.01"><output id="lsv">-0.01em</output></div>
         <div class="row"><span>메모폭</span><input type="range" id="mw" min="30" max="55" step="1" value="44"><output id="mwv">44%</output></div>
-        <div class="row"><span>여백</span><input type="range" id="mg" min="8" max="20" step="1" value="14"><output id="mgv">14mm</output></div>
+        <div class="row"><span>여백</span><input type="range" id="mg" min="6" max="18" step="1" value="12"><output id="mgv">12mm</output></div>
         <label class="chk"><input type="checkbox" id="showlinks" checked> 1페이지에 링크 표시</label>
         <label class="chk"><input type="checkbox" id="memo2"> 녹취록 페이지도 1단 + 메모</label>
         <p class="hint" id="fitnote"></p>
@@ -354,18 +358,39 @@ function render(){
     if(kind!=="p"||!cur){cur=[];groups.push(cur);}
     cur.push([kind,txt]);
   }
-  const colsHtml=groups.map(g=>`<div class="grp">`+g.map(([kind,txt])=>
+  const colsHtml=groups.map((g,i)=>`<div class="grp" data-i="${i}">`+g.map(([kind,txt])=>
     kind==="t"?`<p class="t">${esc(txt)}</p>`:kind==="sec"?`<p class="sec">${esc(txt)}</p>`:kind==="sub"?`<p class="sub">${esc(txt)}</p>`:`<p>${esc(txt)}</p>`).join("")+`</div>`).join("");
   const meta=`<table class="meta"><tr><td>날짜</td><td>${esc(K.date)}</td></tr><tr><td>제목</td><td>${esc(K.title)}</td></tr><tr><td>성경</td><td>${esc(K.ref)}</td></tr>${K.source?`<tr><td>출처</td><td>${esc(K.source)}</td></tr>`:""}</table>`;
   const verse0=K.verse?`<p class="verse0">♠ 성경말씀(${esc(K.ref)}) ${esc(K.verse)}</p>`:"";
-  const p2=`<div class="doc"><div class="page body">${meta}
-    <div class="cols ${memo2?"one":""}" contenteditable="true" spellcheck="false">${verse0}${colsHtml}</div>
+  const p2=`<div class="doc tdoc"><div class="page body">${meta}
+    <div class="cols ${memo2?"one":""}" contenteditable="true" spellcheck="false"><div class="grp" data-i="v">${verse0}</div>${colsHtml}</div>
     ${memo2?`<div class="memo"><div class="free" contenteditable="true"></div></div>`:""}
   </div></div>`;
   const reader=`<div class="reader" contenteditable="true" spellcheck="false"><div class="rh">${esc(K.title)}</div><div class="hint" style="margin-bottom:12px">${esc(K.date)} · ${esc(K.ref)}</div>
-    <div class="rsum">${bodyHtml}</div><div class="rbody">${verse0}${colsHtml}</div></div>`;
+    <div class="rsum">${bodyHtml}</div><div class="rbody"><div class="grp" data-i="v">${verse0}</div>${colsHtml}</div></div>`;
   $("#stage").innerHTML=p1+p2+reader;
   setPlayer(); applyVars(); saveEdits(); toast("노트를 만들었습니다");
+}
+/* 녹취록을 B5 페이지 여러 장으로 나눔 (grp 단위, 단 사이에서 끊기지 않음) */
+function paginate(){
+  const tdoc=$(".tdoc"); if(!tdoc)return;
+  const pages=[...tdoc.querySelectorAll(".page.body")]; const first=pages[0]; if(!first)return;
+  const units=[...tdoc.querySelectorAll(".cols .grp")];
+  const memo2=$("#memo2").checked;
+  const mkPage=(withMeta)=>{const pg=document.createElement("div");pg.className="page body";
+    if(withMeta){const m=first.querySelector(".meta");if(m)pg.appendChild(m);}
+    const c=document.createElement("div");c.className="cols"+(memo2?" one":"");c.contentEditable="true";c.spellcheck=false;pg.appendChild(c);
+    if(memo2){const mm=document.createElement("div");mm.className="memo";mm.innerHTML='<div class="free" contenteditable="true"></div>';if(!withMeta)mm.style.top="var(--m)";pg.appendChild(mm);}
+    return pg;};
+  const memos=pages.map(p=>p.querySelector(".memo .free")?.innerHTML||"");
+  const fresh=mkPage(true); tdoc.innerHTML=""; tdoc.appendChild(fresh);
+  let pg=fresh,col=fresh.querySelector(".cols");
+  const over=()=>col.scrollWidth>col.clientWidth+1||col.scrollHeight>col.clientHeight+1;
+  for(const u of units){
+    col.appendChild(u);
+    if(over()&&col.children.length>1){col.removeChild(u);pg=mkPage(false);tdoc.appendChild(pg);col=pg.querySelector(".cols");col.appendChild(u);}
+  }
+  [...tdoc.querySelectorAll(".page")].forEach((p,i)=>{const f=p.querySelector(".memo .free");if(f&&memos[i])f.innerHTML=memos[i];});
 }
 let ytOverride="";
 function setPlayer(){
@@ -380,7 +405,7 @@ function applyVars(){
   const fs=$("#fs").value,lh=$("#lh").value,ls=$("#ls").value,mw=$("#mw").value,mg=$("#mg").value;
   $("#fsv").textContent=fs+"pt";$("#lhv").textContent=lh;$("#lsv").textContent=(+ls).toFixed(3).replace(/0+$/,"").replace(/\.$/,"")+"em";$("#mwv").textContent=mw+"%";$("#mgv").textContent=mg+"mm";
   $$(".doc").forEach(d=>{d.style.setProperty("--fs",fs+"pt");d.style.setProperty("--lh",lh);d.style.setProperty("--ls",ls+"em");d.style.setProperty("--memo",mw);d.style.setProperty("--m",mg+"mm");});
-  fitPage1(); save();
+  fitPage1(); paginate(); save();
 }
 function fitPage1(){
   const pg=$(".page.summary"), left=pg&&pg.querySelector(".left"); if(!left)return;
@@ -401,12 +426,13 @@ function renderHist(){const h=$("#hist"); if(!h)return; let all={}; try{all=JSON
   h.querySelectorAll("[data-open]").forEach(b=>b.onclick=e=>{const k=b.dataset.open; if(e.target.dataset.del){delete all[k];localStorage.setItem("pn_notes",JSON.stringify(all));renderHist();return;}
     const n=all[k]; $("#kakao").value=n.k;$("#trans").value=n.t;ytOverride=n.yt||"";$("#stage").innerHTML=n.html;K=parseKakao(n.k);setPlayer();applyVars();save();localStorage.setItem("pn_edit",JSON.stringify({key:n.k.slice(0,80)+"|"+n.t.length,html:n.html,yt:ytOverride}));mode("video");toast(k+" 노트를 열었습니다");});}
 function load(){try{const s=JSON.parse(localStorage.getItem("pn")||"null");if(!s)return false;
-  $("#kakao").value=s.k||"";$("#trans").value=s.t||"";$("#fs").value=s.fs||10;$("#lh").value=s.lh||1.6;$("#ls").value=s.ls||0;$("#mw").value=s.mw||44;$("#mg").value=s.mg||14;$("#showlinks").checked=s.sl!==false;$("#memo2").checked=!!s.m2;return !!(s.k||s.t);}catch(e){return false;}}
+  $("#kakao").value=s.k||"";$("#trans").value=s.t||"";$("#fs").value=s.fs||9;$("#lh").value=s.lh||1.55;$("#ls").value=s.ls??-0.01;$("#mw").value=s.mw||44;$("#mg").value=s.mg||12;$("#showlinks").checked=s.sl!==false;$("#memo2").checked=!!s.m2;return !!(s.k||s.t);}catch(e){return false;}}
 function loadEdits(){try{const e=JSON.parse(localStorage.getItem("pn_edit")||"null");
   if(e&&e.key===$("#kakao").value.slice(0,80)+"|"+$("#trans").value.length&&e.html){ytOverride=e.yt||"";$("#stage").innerHTML=e.html;K=parseKakao($("#kakao").value);setPlayer();applyVars();return true;}}catch(e){}return false;}
 let edT; $("#stage").addEventListener("input",e=>{syncBody(e.target);clearTimeout(edT);edT=setTimeout(saveEdits,400);});
 function syncBody(t){const rb=t.closest(".rbody"),cols=t.closest(".cols"),rs=t.closest(".rsum"),sb=t.closest(".summary .body");
-  if(rb){const c=$(".cols");if(c)c.innerHTML=rb.innerHTML;} else if(cols){const r=$(".rbody");if(r)r.innerHTML=cols.innerHTML;}
+  const copy=(from,to)=>{const map={};to.querySelectorAll(".grp[data-i]").forEach(g=>map[g.dataset.i]=g);from.querySelectorAll(".grp[data-i]").forEach(g=>{const d=map[g.dataset.i];if(d&&d.innerHTML!==g.innerHTML)d.innerHTML=g.innerHTML;});};
+  if(rb){const c=$(".tdoc");if(c)copy(rb,c);} else if(cols){const r=$(".rbody");if(r)copy($(".tdoc"),r);}
   else if(rs){const b=$(".summary .body");if(b)b.innerHTML=rs.innerHTML;} else if(sb){const r=$(".rsum");if(r)r.innerHTML=sb.innerHTML;}
   archive();}
 
@@ -436,14 +462,31 @@ function showTb(){
 }
 document.addEventListener("selectionchange",()=>setTimeout(showTb,10));
 tb.addEventListener("mousedown",e=>e.preventDefault());
+function selTextNodes(){
+  const sel=getSelection(); if(!sel||sel.isCollapsed||!sel.rangeCount)return [];
+  const r=sel.getRangeAt(0);
+  if(r.startContainer.nodeType===3&&r.startOffset>0){const n=r.startContainer.splitText(r.startOffset);r.setStart(n,0);}
+  if(r.endContainer.nodeType===3&&r.endOffset<r.endContainer.length){r.endContainer.splitText(r.endOffset);}
+  const root=r.commonAncestorContainer.nodeType===1?r.commonAncestorContainer:r.commonAncestorContainer.parentElement;
+  const w=document.createTreeWalker(root,NodeFilter.SHOW_TEXT),out=[];
+  while(w.nextNode()){const n=w.currentNode;if(r.intersectsNode(n)&&n.textContent.trim()&&!n.parentElement.closest(".memo,.meta"))out.push(n);}
+  return out;
+}
+function styleSel(fn){
+  const nodes=selTextNodes(); if(!nodes.length)return null;
+  for(const n of nodes){let sp=n.parentElement; if(!(sp.classList.contains("hl")&&sp.childNodes.length===1)){sp=document.createElement("span");sp.className="hl";n.replaceWith(sp);sp.appendChild(n);} fn(sp);
+    if(!sp.getAttribute("style")){sp.replaceWith(...sp.childNodes);} }
+  const last=nodes[nodes.length-1].parentElement; getSelection().removeAllRanges(); return last;
+}
 tb.addEventListener("click",e=>{
   const b=e.target.closest("button"); if(!b)return;
-  document.execCommand("styleWithCSS",false,true);
-  if(b.dataset.hl)document.execCommand("hiliteColor",false,b.dataset.hl);
-  else if(b.dataset.fc)document.execCommand("foreColor",false,b.dataset.fc);
-  else if(b.dataset.cmd==="bold")document.execCommand("bold");
-  else if(b.dataset.cmd==="clear"){document.execCommand("removeFormat");document.execCommand("hiliteColor",false,"transparent");}
-  const sel=getSelection();const n=sel&&sel.anchorNode&&(sel.anchorNode.nodeType===1?sel.anchorNode:sel.anchorNode.parentElement);if(n)syncBody(n);
+  let n=null;
+  if(b.dataset.hl)n=styleSel(sp=>sp.style.backgroundColor=b.dataset.hl);
+  else if(b.dataset.fc)n=styleSel(sp=>sp.style.color=b.dataset.fc);
+  else if(b.dataset.cmd==="bold")n=styleSel(sp=>sp.style.fontWeight="700");
+  else if(b.dataset.cmd==="clear")n=styleSel(sp=>sp.removeAttribute("style"));
+  tb.classList.remove("show");
+  if(n)syncBody(n.nodeType===1?n:n.parentElement);
   saveEdits();
 });
 
@@ -453,7 +496,7 @@ $("#jpg").onclick=async()=>{
   const pages=$$(".page"); if(!pages.length)return; toast("JPG 만드는 중…");
   const base=(K.date||"기도수첩").replace(/[^\d]/g,"").slice(0,8)||"note";
   for(let i=0;i<pages.length;i++){
-    const c=await html2canvas(pages[i],{scale:2,backgroundColor:"#ffffff",useCORS:true});
+    const c=await html2canvas(pages[i],{scale:2.5,backgroundColor:"#ffffff",useCORS:true});
     const a=document.createElement("a"); a.download=`기도수첩_${base}_${i+1}.jpg`; a.href=c.toDataURL("image/jpeg",.92); a.click();
     await new Promise(r=>setTimeout(r,400));
   }
